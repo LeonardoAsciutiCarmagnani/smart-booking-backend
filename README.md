@@ -42,71 +42,6 @@ O projeto foi desenvolvido com arquitetura orientada a **resiliência**, utiliza
 - Visualização e gestão de agendamentos por status
 - Timeline de eventos do agendamento (auditoria)
 
----
-
-## Diferenciais Técnicos (Nível Produção)
-
-### 1) Idempotência (Idempotency Key)
-
-Operações críticas como criação de agendamento utilizam **Idempotency-Key** para evitar duplicidade em casos como:
-
-- double click no botão
-- reenvio por instabilidade de rede
-- retries automáticos do cliente
-
-**Resultado:** a mesma requisição não cria 2 agendamentos.
-
----
-
-### 2) Concorrência e Consistência (Redis Lock)
-
-Para impedir que duas pessoas reservem o mesmo horário simultaneamente, o backend aplica um **lock por slot** usando Redis:
-
-- `lock:{providerId}:{startAtISO}` com TTL curto (ex.: 10s)
-
-**Resultado:** elimina conflito de concorrência no momento da criação do booking.
-
----
-
-### 3) Automação com BullMQ (Jobs Delayed)
-
-O sistema executa tarefas assíncronas para garantir consistência e reduzir carga no request principal.
-
-Exemplos:
-
-- Expirar automaticamente bookings `PENDING` após X minutos
-- Agendar lembretes (24h / 1h antes do horário) _(opcional/Plus)_
-
----
-
-### 4) Cache de Slots (Redis)
-
-O endpoint de slots disponíveis pode ser custoso (regras + bloqueios + bookings do dia).Para otimizar, o sistema utiliza cache por data/serviço:
-
-- `slots:{providerId}:{serviceId}:{YYYY-MM-DD}` com TTL curto
-
-Cache é invalidado quando:
-
-- cria/expira/confirma/cancela booking
-- altera disponibilidade
-- cria/remove bloqueio
-
----
-
-### 5) Auditoria (Booking Events)
-
-Toda transição importante registra um evento em histórico:
-
-- created
-- confirmed
-- expired
-- cancelled
-- reminder_sent
-
-**Resultado:** rastreabilidade completa e fácil debugging.
-
----
-
 ## Stack e Tecnologias
 
 ### Front-end
@@ -115,15 +50,15 @@ Toda transição importante registra um evento em histórico:
 - TypeScript
 - Tailwind CSS
 - Shadcn/UI
-- Zustand (ou Context API)
-- Zod (validação de formulários)
+- Context API
+- Zod
 
 ### Back-end
 
-- Node.js + Express (em Firebase Functions)
+- Node.js + Express (Firebase Functions)
 - TypeScript
-- Zod (validação de payloads)
-- Firestore (persistência)
+- Zod 
+- Firestore
 
 ### Infra / Assíncrono
 
@@ -142,21 +77,4 @@ Toda transição importante registra um evento em histórico:
   - cache de slots (performance)
 - **BullMQ** executa automações:
   - expiração de booking pendente
-  - lembretes (opcional)
-
----
-
-## Status do Booking (State Machine)
-
-Estados:
-
-- `PENDING`: reservado temporariamente, aguardando confirmação
-- `CONFIRMED`: confirmado e válido
-- `EXPIRED`: expirou automaticamente por falta de confirmação
-- `CANCELLED`: cancelado manualmente
-- `NO_SHOW`: cliente não compareceu
-
-Transições permitidas (exemplo):
-
-- `PENDING → CONFIRMED | EXPIRED | CANCELLED`
-- `CONFIRMED → CANCELLED | NO_SHOW`
+  - lembretes
